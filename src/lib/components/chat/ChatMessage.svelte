@@ -9,6 +9,8 @@
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
 	import CarbonDownload from "~icons/carbon/download";
+	import CarbonThumbsUp from "~icons/carbon/thumbs-up";
+	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
 
@@ -38,9 +40,14 @@
 	export let model: Model;
 	export let message: Message;
 	export let loading = false;
+	export let isAuthor = true;
 	export let readOnly = false;
+	export let isTapped = false;
 
-	const dispatch = createEventDispatcher<{ retry: void }>();
+	const dispatch = createEventDispatcher<{
+		retry: { content: string; id: Message["id"] };
+		vote: { score: Message["score"]; id: Message["id"] };
+	}>();
 
 	let contentEl: HTMLElement;
 	let loadingEl: IconLoading;
@@ -85,14 +92,18 @@
 </script>
 
 {#if message.from === "assistant"}
-	<div class="flex items-start justify-start gap-4 leading-relaxed">
+	<div
+		class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed"
+		on:click={() => (isTapped = !isTapped)}
+		on:keypress={() => (isTapped = !isTapped)}
+	>
 		<img
 			alt=""
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
 			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 		/>
 		<div
-			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px] rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
+			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
 			{#if !message.content}
 				<IconLoading classNames="absolute inset-0 m-auto" />
@@ -111,12 +122,46 @@
 				{/each}
 			</div>
 		</div>
+		{#if isAuthor && !loading && message.content}
+			<div
+				class="absolute bottom-1 right-0 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
+					{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
+					{isTapped ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
+				"
+			>
+				<button
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					{message.score && message.score > 0
+						? 'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'
+						: ''}"
+					title={message.score === 1 ? "Remove +1" : "+1"}
+					type="button"
+					on:click={() => dispatch("vote", { score: message.score === 1 ? 0 : 1, id: message.id })}
+				>
+					<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
+				</button>
+				<button
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					{message.score && message.score < 0
+						? 'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'
+						: ''}"
+					title={message.score === -1 ? "Remove -1" : "-1"}
+					type="button"
+					on:click={() =>
+						dispatch("vote", { score: message.score === -1 ? 0 : -1, id: message.id })}
+				>
+					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
+				</button>
+			</div>
+		{/if}
 	</div>
 {/if}
 {#if message.from === "user"}
 	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
-		<div class="whitespace-break-spaces rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
+		<div
+			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
+		>
 			{message.content.trim()}
 		</div>
 		{#if !loading}
@@ -137,7 +182,7 @@
 						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
 						title="Retry"
 						type="button"
-						on:click={() => dispatch("retry")}
+						on:click={() => dispatch("retry", { content: message.content, id: message.id })}
 					>
 						<CarbonRotate360 />
 					</button>
